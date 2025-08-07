@@ -38,9 +38,13 @@ A desktop application that automatically downloads CSV files from an assessment 
 2. Enter your assessment platform credentials in the Authentication section
 
 3. Enter the URLs of the assessment results pages (one URL per line)
+4. (Optional) Enter your assessment platform credentials in the Authentication section
+   - If you leave both username and password fields empty, you can manually log in when the browser opens
+   - The application will wait 30 seconds for you to manually log in before proceeding
 
 4. Click "Start Processing" to begin:
-   - The application will log into the assessment platform
+   - If credentials are provided, the application will automatically log into the assessment platform
+   - If no credentials are provided, you can manually log in when the browser opens (you have 30 seconds)
    - Navigate to each provided URL
    - Download the CSV data files
    - Process the files to extract teacher response data
@@ -103,6 +107,13 @@ For the teacher tracking to work properly:
 5. **Categorization**: Teachers not in [`teachers.csv`](teachers.csv) are grouped as "Other"
 
 ## How It Works
+
+### Optional Authentication
+
+The application now supports optional authentication credentials:
+- If you provide both username and password, the application will automatically log in
+- If you leave both fields empty, you can manually log in when the browser opens
+- The application will wait 30 seconds for manual login before proceeding with downloads
 
 ### Performance Improvements
 

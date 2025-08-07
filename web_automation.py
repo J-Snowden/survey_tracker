@@ -10,6 +10,7 @@ class WebAutomationModule:
         self.playwright = None
         self.browser = None
         self.context = None
+        self.is_authenticated = False  # Track authentication state across URLs
         
         # Ensure download directory exists
         os.makedirs(self.download_dir, exist_ok=True)
@@ -161,6 +162,24 @@ class WebAutomationModule:
                              
                             # Wait for navigation
                             await page.wait_for_timeout(2000)  # Wait 2 seconds
+                    # If no credentials provided, wait for user to manually log in
+                    elif not username and not password:
+                        # Only check login status if we haven't authenticated yet in this session
+                        if not self.is_authenticated:
+                            self.logger.info("No credentials provided - checking authentication status")
+                            logged_in = await self._check_if_logged_in(page)
+                            if not logged_in:
+                                self.logger.info("Not logged in - waiting for user to log in")
+                                # Wait for login with longer timeout and better detection
+                                login_successful = await self._wait_for_login_or_timeout(page, 60000)  # Increased to 60s
+                                if login_successful:
+                                    self.is_authenticated = True
+                                    self.logger.info("Authentication successful - session will be maintained")
+                            else:
+                                self.logger.info("Already logged in - marking session as authenticated")
+                                self.is_authenticated = True
+                        else:
+                            self.logger.info("Session already authenticated - proceeding with download")
                     
                     # Wait for the page to load
                     await page.wait_for_timeout(1500)  # Wait 1.5 seconds
@@ -234,3 +253,67 @@ class WebAutomationModule:
             self.logger.info("Web automation module closed successfully")
         except Exception as e:
             self.logger.error(f"Error closing web automation module: {str(e)}")
+    
+    async def _check_if_logged_in(self, page):
+        """Check if user is already logged in by looking for common elements"""
+        try:
+            # Check for login-related elements (login form indicates NOT logged in)
+            login_form = await page.query_selector("form")
+            login_inputs = await page.query_selector_all("input[type='password'], input[name*='password'], input[name*='login'], input[name*='email']")
+            
+            if login_form and login_inputs:
+                return False
+            
+            # Check for download button (presence indicates logged in to results page)
+            download_button = await page.query_selector("a:has-text('Download')") or \
+                             await page.query_selector("button:has-text('Download')") or \
+                             await page.query_selector("a:has-text('Download results file')") or \
+                             await page.query_selector("a[href*='download']")
+            
+            if download_button:
+                return True
+            
+            # Look for common elements that indicate user is logged in
+            user_elements = await page.query_selector_all("[data-user], .user-name, .logged-in, [aria-label*='Logout'], [title*='Logout']")
+            if user_elements:
+                return True
+                
+            # Check for URL patterns that indicate logged-in state
+            current_url = page.url
+            logged_in_patterns = ["/dashboard", "/home", "/account", "/profile"]
+            for pattern in logged_in_patterns:
+                if pattern in current_url:
+                    return True
+            
+            return False
+        except Exception as e:
+            self.logger.warning(f"Error checking login status: {str(e)}")
+            return False
+    
+    async def _wait_for_login_or_timeout(self, page, timeout_ms):
+        """Wait for user to log in or timeout"""
+        start_time = asyncio.get_event_loop().time()
+        timeout_seconds = timeout_ms / 1000
+        check_count = 0
+        
+        self.logger.info(f"Waiting up to {timeout_seconds:.0f} seconds for user to log in...")
+        
+        while (asyncio.get_event_loop().time() - start_time) < timeout_seconds:
+            check_count += 1
+            elapsed = asyncio.get_event_loop().time() - start_time
+            
+            # Check if user is now logged in
+            if await self._check_if_logged_in(page):
+                self.logger.info(f"User login detected - proceeding with download")
+                return True
+                
+            # Log progress every 15 seconds
+            if check_count % 15 == 0:
+                remaining = timeout_seconds - elapsed
+                self.logger.info(f"Still waiting for login... {remaining:.0f} seconds remaining")
+                
+            # Wait a bit before checking again
+            await page.wait_for_timeout(1000)  # Check every second
+            
+        self.logger.info("Login timeout reached - proceeding with download")
+        return False

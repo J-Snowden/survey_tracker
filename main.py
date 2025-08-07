@@ -59,15 +59,17 @@ class SurveyDataTracker:
         cred_frame.grid(row=1, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 10))
         cred_frame.columnconfigure(1, weight=1)
         
-        ttk.Label(cred_frame, text="Username:").grid(row=0, column=0, sticky=tk.W, padx=(0, 10))
+        ttk.Label(cred_frame, text="Username (optional):").grid(row=0, column=0, sticky=tk.W, padx=(0, 10))
         self.username_var = tk.StringVar()
         self.username_entry = ttk.Entry(cred_frame, textvariable=self.username_var, width=30)
         self.username_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), pady=(0, 5))
         
-        ttk.Label(cred_frame, text="Password:").grid(row=1, column=0, sticky=tk.W, padx=(0, 10))
+        ttk.Label(cred_frame, text="Password (optional):").grid(row=1, column=0, sticky=tk.W, padx=(0, 10))
         self.password_var = tk.StringVar()
         self.password_entry = ttk.Entry(cred_frame, textvariable=self.password_var, show="*", width=30)
         self.password_entry.grid(row=1, column=1, sticky=(tk.W, tk.E))
+        
+        ttk.Label(cred_frame, text="Leave both fields empty to manually log in when browser opens").grid(row=2, column=0, columnspan=2, sticky=tk.W, padx=(0, 10), pady=(5, 0))
         
         # URLs section
         url_frame = ttk.LabelFrame(main_frame, text="Assessment URLs", padding="10")
@@ -134,8 +136,11 @@ class SurveyDataTracker:
         username = self.username_var.get().strip()
         password = self.password_var.get()
         
-        if not username or not password:
-            messagebox.showerror("Error", "Please enter both username and password")
+        # Credentials are now optional - user can manually log in
+        if not username and not password:
+            self.log_message("No credentials provided - you can manually log in when the browser opens")
+        elif not username or not password:
+            messagebox.showerror("Error", "Please enter both username and password, or leave both fields empty to log in manually")
             return
             
         # Get URLs
@@ -184,12 +189,15 @@ class SurveyDataTracker:
                 
             # Step 2: Download files
             self.update_progress("Downloading files...", 30, 100)
-            downloaded_files = loop.run_until_complete(self.web_module.download_files(
-                urls,
-                username,
-                password,
-                progress_callback=self.update_progress
-            ))
+            # Pass credentials only if provided
+            download_args = [urls]
+            if username and password:
+                download_args.extend([username, password])
+            else:
+                download_args.extend([None, None])
+            download_args.append(self.update_progress)
+            
+            downloaded_files = loop.run_until_complete(self.web_module.download_files(*download_args))
             
             if not downloaded_files:
                 self.log_message("No files were downloaded")
