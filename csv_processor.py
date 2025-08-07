@@ -61,6 +61,10 @@ class CSVProcessor:
         """
         file_data = {}
         
+        # Determine time type and filename for this file
+        time_type = self._classify_file_type(file_path)
+        filename_without_ext = os.path.splitext(os.path.basename(file_path))[0]
+        
         try:
             # Read CSV file
             df = pd.read_csv(file_path)
@@ -132,7 +136,12 @@ class CSVProcessor:
                         if all_blank:  # All blank (no responses)
                             file_data[key]["blanks"] += 1
                     else:
-                        file_data[key] = {"responses": 1 if has_data else 0, "blanks": 1 if all_blank else 0}
+                        file_data[key] = {
+                            "responses": 1 if has_data else 0,
+                            "blanks": 1 if all_blank else 0,
+                            "time_type": time_type,
+                            "filename": filename_without_ext
+                        }
                 except Exception as e:
                     self.logger.error(f"Error processing row {index} in {file_path}: {str(e)}")
                     continue
@@ -142,6 +151,16 @@ class CSVProcessor:
             raise
             
         return file_data
+    
+    def _classify_file_type(self, file_path):
+        """Classify file as pre or post based on filename"""
+        filename = os.path.basename(file_path).lower()
+        if 'pre' in filename:
+            return "Pre"
+        elif 'post' in filename:
+            return "Post"
+        else:
+            return ""
     
     def validate_csv_structure(self, file_path):
         """

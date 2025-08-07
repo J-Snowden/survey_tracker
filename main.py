@@ -9,6 +9,7 @@ from datetime import datetime
 from web_automation import WebAutomationModule
 from csv_processor import CSVProcessor
 from report_generator import ReportGenerator
+from teacher_tracker import TeacherTracker
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -30,6 +31,7 @@ class SurveyDataTracker:
         self.web_module = WebAutomationModule(self.download_dir)
         self.csv_processor = CSVProcessor()
         self.report_generator = ReportGenerator()
+        self.teacher_tracker = TeacherTracker()
         
         # Processing variables
         self.processing_thread = None
@@ -207,10 +209,19 @@ class SurveyDataTracker:
                 return
             else:
                 self.log_message(f"Processed data for {len(processed_data)} teacher-date combinations")
+            
+            # Step 5: Process teacher tracking data
+            self.update_progress("Processing teacher tracking data...", 80, 100)
+            teacher_stats = self.teacher_tracker.process_teacher_data(
+                downloaded_files,
+                progress_callback=self.update_progress
+            )
+            teacher_report_data = self.teacher_tracker.generate_teacher_report_data(teacher_stats)
+            self.log_message(f"Processed teacher data for {len(teacher_report_data)} teachers")
                 
-            # Step 5: Generate report
+            # Step 6: Generate report
             self.update_progress("Generating report...", 90, 100)
-            report_path = self.report_generator.generate_report(processed_data)
+            report_path = self.report_generator.generate_report(processed_data, teacher_data=teacher_report_data)
             
             # Generate summary statistics
             summary = self.report_generator.generate_summary_statistics(processed_data)

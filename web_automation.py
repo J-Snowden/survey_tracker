@@ -42,7 +42,7 @@ class WebAutomationModule:
             
             # Set download path
             self.logger.info("Setting default timeout...")
-            self.context.set_default_timeout(30000)  # 30 second timeout
+            self.context.set_default_timeout(10000)  # 10 second timeout
             self.logger.info("Web automation module initialized successfully")
             return True
         except Exception as e:
@@ -158,12 +158,12 @@ class WebAutomationModule:
                                     await page.press("input", "Enter")
                                 except Exception as e:
                                     self.logger.error(f"Failed to submit login form: {str(e)}")
-                            
+                             
                             # Wait for navigation
-                            await page.wait_for_timeout(5000)  # Wait 5 seconds
+                            await page.wait_for_timeout(2000)  # Wait 2 seconds
                     
                     # Wait for the page to load
-                    await page.wait_for_timeout(3000)  # Wait 3 seconds
+                    await page.wait_for_timeout(1500)  # Wait 1.5 seconds
                     
                     # Find and click the download button
                     # This is a placeholder - you'll need to adjust the selector based on your platform
@@ -191,8 +191,8 @@ class WebAutomationModule:
                             self.logger.info(f"Downloaded file: {file_path}")
                             
                             if progress_callback:
-                                progress_callback(f"Downloaded: {filename}", i+1, len(urls))
-                        await page.wait_for_timeout(2000)  # Wait 2 seconds between downloads
+                               progress_callback(f"Downloaded: {original_filename}", i+1, len(urls))
+                            await page.wait_for_timeout(1000)  # Wait 1 second between downloads
                     else:
                         self.logger.warning(f"No download button found on page: {url}")
                         if progress_callback:
