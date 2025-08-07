@@ -36,12 +36,12 @@ class CSVProcessor:
                 file_data = self._process_single_file(file_path)
                 
                 # Merge with overall data
-                for (teacher_id, date), count in file_data.items():
+                for (teacher_id, date), counts in file_data.items():
                     if (teacher_id, date) in all_data:
-                        all_data[(teacher_id, date)] += count
+                        all_data[(teacher_id, date)]["responses"] += counts["responses"]
+                        all_data[(teacher_id, date)]["blanks"] += counts["blanks"]
                     else:
-                        all_data[(teacher_id, date)] = count
-                        
+                        all_data[(teacher_id, date)] = counts.copy()
             except Exception as e:
                 self.logger.error(f"Error processing file {file_path}: {str(e)}")
                 if progress_callback:
@@ -67,56 +67,72 @@ class CSVProcessor:
             self.logger.info(f"Read CSV file: {file_path} with {len(df)} rows")
             
             # Validate that required columns exist
-            if "Student ID" not in df.columns or "End Time" not in df.columns:
-                raise ValueError("Required columns (Student ID, End Time) not found in CSV file")
+            if "Student ID" not in df.columns or "Start Time" not in df.columns:
+                raise ValueError("Required columns (Student ID, Start Time) not found in CSV file")
             
-            # Identify unique test variable columns (columns after standard columns)
-            unique_columns = [col for col in df.columns if col not in self.standard_columns]
+            # Find the "Teacher" column (column containing "Teacher" in its name)
+            teacher_column = None
+            for col in df.columns:
+                if "teacher" in col.lower():
+                    teacher_column = col
+                    break
             
-            if not unique_columns:
-                self.logger.warning(f"No unique test variable columns found in {file_path}")
+            if teacher_column is None:
+                self.logger.warning(f"No 'Teacher' column found in {file_path}")
+                # Use all columns after standard columns as test variables
+                test_variable_columns = [col for col in df.columns if col not in self.standard_columns]
+            else:
+                # Get columns that come after the teacher column
+                teacher_col_index = df.columns.get_loc(teacher_column)
+                test_variable_columns = df.columns[teacher_col_index + 1:].tolist()
+            
+            if not test_variable_columns:
+                self.logger.warning(f"No test variable columns found in {file_path}")
             
             # Process each row
             for index, row in df.iterrows():
                 try:
-                    # Extract teacher ID (first 3 characters of Student ID)
+                    # Extract teacher ID from Student ID
                     student_id = str(row["Student ID"])
-                    if len(student_id) < 3:
-                        self.logger.warning(f"Student ID too short: {student_id}")
-                        continue
-                        
-                    teacher_id = student_id[:3]
+                    teacher_id = "Other"  # Default to "Other"
                     
-                    # Check if any unique test variable columns have data
+                    # Try to extract first 3 digits as teacher ID
+                    if len(student_id) >= 3 and student_id[:3].isdigit():
+                        teacher_id = student_id[:3]
+                    
+                    # Check if any test variable columns have data (responses)
                     has_data = False
-                    for col in unique_columns:
+                    all_blank = True  # Track if all test variable columns are blank
+                    
+                    for col in test_variable_columns:
                         if col in row and pd.notna(row[col]) and str(row[col]).strip() != "":
                             has_data = True
+                            all_blank = False
                             break
                     
-                    # Only count if there's data in unique test variables
-                    if has_data:
-                        # Extract date from End Time
-                        end_time = row["End Time"]
-                        if pd.isna(end_time) or str(end_time).strip() == "":
-                            self.logger.warning(f"Empty End Time for student {student_id}")
-                            continue
-                            
-                        try:
-                            # Parse date (assuming format like "YYYY-MM-DD HH:MM:SS")
-                            date_obj = pd.to_datetime(end_time)
-                            date_str = date_obj.strftime("%Y-%m-%d")
-                        except Exception as e:
-                            self.logger.warning(f"Could not parse date {end_time}: {str(e)}")
-                            continue
+                    # Extract date from Start Time
+                    start_time = row["Start Time"]
+                    if pd.isna(start_time) or str(start_time).strip() == "":
+                        self.logger.warning(f"Empty Start Time for student {student_id}")
+                        continue
                         
-                        # Update count
-                        key = (teacher_id, date_str)
-                        if key in file_data:
-                            file_data[key] += 1
-                        else:
-                            file_data[key] = 1
-                            
+                    try:
+                        # Parse date (assuming format like "YYYY-MM-DD HH:MM:SS")
+                        date_obj = pd.to_datetime(start_time)
+                        date_str = date_obj.strftime("%Y-%m-%d")
+                    except Exception as e:
+                        self.logger.warning(f"Could not parse date {start_time}: {str(e)}")
+                        continue
+                    
+                    # Update counts
+                    key = (teacher_id, date_str)
+                    if key in file_data:
+                        if has_data:  # Has responses
+                            file_data[key]["responses"] += 1
+                        if all_blank:  # All blank (no responses)
+                            file_data[key]["blanks"] += 1
+                    else:
+                        file_data[key] = {"responses": 1 if has_data else 0, "blanks": 1 if all_blank else 0}
                 except Exception as e:
                     self.logger.error(f"Error processing row {index} in {file_path}: {str(e)}")
                     continue
@@ -142,7 +158,7 @@ class CSVProcessor:
             df = pd.read_csv(file_path, nrows=0)
             
             # Check for required columns
-            required_columns = ["Student ID", "End Time"]
+            required_columns = ["Student ID", "Start Time"]
             missing_columns = [col for col in required_columns if col not in df.columns]
             
             if missing_columns:

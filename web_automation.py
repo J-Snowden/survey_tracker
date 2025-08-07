@@ -179,9 +179,11 @@ class WebAutomationModule:
                             await download_button.click()
                             download = await download_info.value
                             
-                            # Generate filename
-                            filename = f"survey_data_{i+1}.csv"
-                            file_path = os.path.join(self.download_dir, filename)
+                            # Save the downloaded file with its original name
+                            original_filename = download.suggested_filename
+                            if not original_filename:
+                                original_filename = f"survey_data_{i+1}.csv"
+                            file_path = os.path.join(self.download_dir, original_filename)
                             
                             # Save the downloaded file
                             await download.save_as(file_path)

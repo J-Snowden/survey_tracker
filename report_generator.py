@@ -30,15 +30,16 @@ class ReportGenerator:
             if not data:
                 self.logger.warning("No data to generate report from")
                 # Create empty DataFrame with proper columns
-                df = pd.DataFrame(columns=["Teacher ID", "Date", "Number of Responses"])
+                df = pd.DataFrame(columns=["Teacher ID", "Date", "Number of Responses", "Number of Blanks"])
             else:
                 # Convert data to DataFrame
                 report_data = []
-                for (teacher_id, date), count in data.items():
+                for (teacher_id, date), counts in data.items():
                     report_data.append({
                         "Teacher ID": teacher_id,
                         "Date": date,
-                        "Number of Responses": count
+                        "Number of Responses": counts["responses"],
+                        "Number of Blanks": counts["blanks"]
                     })
                 
                 df = pd.DataFrame(report_data)
@@ -81,17 +82,17 @@ class ReportGenerator:
             # Add title row
             title_cell = ws.cell(row=1, column=1, value="Survey Response Report")
             title_cell.font = Font(size=16, bold=True)
-            ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=3)
+            ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=4)
             ws.cell(row=1, column=1).alignment = Alignment(horizontal="center")
             
             # Add generation date
             date_cell = ws.cell(row=2, column=1, value=f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
             date_cell.font = Font(italic=True)
-            ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=3)
+            ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=4)
             ws.cell(row=2, column=1).alignment = Alignment(horizontal="center")
             
             # Add headers (row 4)
-            headers = ["Teacher ID", "Date", "Number of Responses"]
+            headers = ["Teacher ID", "Date", "Number of Responses", "Number of Blanks"]
             header_font = Font(bold=True)
             header_fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
             
@@ -163,11 +164,13 @@ class ReportGenerator:
         teachers = set()
         dates = set()
         total_responses = 0
+        total_blanks = 0
         
-        for (teacher_id, date), count in data.items():
+        for (teacher_id, date), counts in data.items():
             teachers.add(teacher_id)
             dates.add(date)
-            total_responses += count
+            total_responses += counts["responses"]
+            total_blanks += counts["blanks"]
             
         # Calculate date range
         if dates:
@@ -182,6 +185,7 @@ class ReportGenerator:
         return {
             "total_teachers": len(teachers),
             "total_responses": total_responses,
+            "total_blanks": total_blanks,
             "date_range": date_range,
             "avg_responses_per_teacher": round(avg_responses, 2)
         }

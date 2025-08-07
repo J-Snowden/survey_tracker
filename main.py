@@ -217,6 +217,7 @@ class SurveyDataTracker:
             self.log_message("Summary Statistics:")
             self.log_message(f"  Total Teachers: {summary['total_teachers']}")
             self.log_message(f"  Total Responses: {summary['total_responses']}")
+            self.log_message(f"  Total Blanks: {summary['total_blanks']}")
             self.log_message(f"  Date Range: {summary['date_range']}")
             self.log_message(f"  Avg Responses per Teacher: {summary['avg_responses_per_teacher']}")
             
